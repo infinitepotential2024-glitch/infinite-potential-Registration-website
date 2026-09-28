@@ -34,6 +34,8 @@ export default function Register() {
   });
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [signature, setSignature] = useState(null);
+  const [sigPreview, setSigPreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [formErr, setFormErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,37 +45,38 @@ export default function Register() {
     setV((prev) => ({ ...prev, [k]: value }));
   };
 
-  async function onPhoto(e) {
+  // Shared handler for the two image uploads (photo + signature)
+  const IMG = {
+    photo: { w: 620, h: 800, q: 0.82, max: 150000, setData: setPhoto, setPrev: setPreview },
+    signature: { w: 700, h: 260, q: 0.85, max: 90000, setData: setSignature, setPrev: setSigPreview },
+  };
+
+  async function onImage(e, kind) {
+    const cfg = IMG[kind];
     const f = e.target.files?.[0];
-    setPhoto(null);
-    setPreview(null);
+    cfg.setData(null);
+    cfg.setPrev(null);
 
     if (!f) return;
 
     if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
-      setErrors((prev) => ({
-        ...prev,
-        photo: "Choose a JPG, PNG or WebP image.",
-      }));
+      setErrors((prev) => ({ ...prev, [kind]: "Choose a JPG, PNG or WebP image." }));
       return;
     }
 
     if (f.size > 5 * 1024 * 1024) {
-      setErrors((prev) => ({
-        ...prev,
-        photo: "That photo is larger than 5 MB.",
-      }));
+      setErrors((prev) => ({ ...prev, [kind]: "That image is larger than 5 MB." }));
       return;
     }
 
-    setErrors((prev) => ({ ...prev, photo: "" }));
+    setErrors((prev) => ({ ...prev, [kind]: "" }));
 
     try {
-      const data = await compressImage(f, 620, 800, 0.82, 150000);
-      setPhoto(data);
-      setPreview(data);
+      const data = await compressImage(f, cfg.w, cfg.h, cfg.q, cfg.max);
+      cfg.setData(data);
+      cfg.setPrev(data);
     } catch (err) {
-      setErrors((prev) => ({ ...prev, photo: err.message }));
+      setErrors((prev) => ({ ...prev, [kind]: err.message }));
     }
   }
 
@@ -113,6 +116,10 @@ export default function Register() {
       e.photo = "Upload the candidate photo.";
     }
 
+    if (!signature) {
+      e.signature = "Upload the candidate signature.";
+    }
+
     return e;
   }
 
@@ -134,7 +141,7 @@ export default function Register() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...v, photoBase64: photo }),
+        body: JSON.stringify({ ...v, photoBase64: photo, signatureBase64: signature }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -182,7 +189,7 @@ export default function Register() {
         <form className="card" onSubmit={submit} style={{ marginTop: "1rem" }}>
           <div className="field full">
             <label>
-              Candidate photo <span style={{ color: "var(--orange)" }}>*</span>
+              Recent photo of the candidate <span style={{ color: "var(--orange)" }}>*</span>
             </label>
 
             <div
@@ -227,10 +234,71 @@ export default function Register() {
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
-                  onChange={onPhoto}
+                  onChange={(e) => onImage(e, "photo")}
                 />
-                <p className="hint">JPG, PNG or WebP up to 5 MB.</p>
+                <p className="hint">
+                  Recent passport-size colour photo, face clearly visible. JPG, PNG or
+                  WebP up to 5 MB.
+                </p>
                 <p className="err">{errors.photo}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="field full" style={{ marginTop: "1rem" }}>
+            <label>
+              Candidate signature <span style={{ color: "var(--orange)" }}>*</span>
+            </label>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "1rem",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  width: 200,
+                  height: 72,
+                  border: "2px dashed var(--line)",
+                  borderRadius: 10,
+                  background: "#fff",
+                  display: "grid",
+                  placeItems: "center",
+                  overflow: "hidden",
+                  fontSize: ".72rem",
+                  color: "var(--muted)",
+                  textAlign: "center",
+                }}
+              >
+                {sigPreview ? (
+                  <img
+                    src={sigPreview}
+                    alt="signature preview"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : (
+                  "No signature"
+                )}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => onImage(e, "signature")}
+                />
+                <p className="hint">
+                  Sign with a black or blue pen on plain white paper, then upload a
+                  clear, straight, well-lit photo. It will be printed on the admit card.
+                </p>
+                <p className="err">{errors.signature}</p>
               </div>
             </div>
           </div>
