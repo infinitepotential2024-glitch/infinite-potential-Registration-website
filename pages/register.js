@@ -137,10 +137,18 @@ export default function Register() {
         body: JSON.stringify({ ...v, photoBase64: photo }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setFormErr(data.error || "Registration failed.");
+        if (data.errors) {
+          // Server-side validation errors (field by field)
+          setErrors(data.errors);
+          setFormErr("Fix the highlighted fields and submit again.");
+        } else {
+          setFormErr(
+            data.error || `Registration failed (error ${res.status}). Try again.`
+          );
+        }
         return;
       }
 
